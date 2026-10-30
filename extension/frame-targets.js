@@ -15,6 +15,8 @@ export class FrameTargets {
   }
   initialize(sessionId) {
     const session = this.sessions.get(sessionId);
+    // A failed setup is retried by the next action instead of poisoning the entry.
+    if (session.error) { session.error = undefined; session.ready = undefined; }
     session.ready ||= (async () => {
       await this.command(sessionId, 'Page.enable');
       await this.command(sessionId, 'Runtime.enable');
@@ -26,7 +28,7 @@ export class FrameTargets {
     const sessionId = source.sessionId || '', session = this.sessions.get(sessionId);
     if (!session) return;
     if (method === 'Target.attachedToTarget' && params.targetInfo.type === 'iframe') {
-      this.sessions.set(params.sessionId, { parent: sessionId, contexts: new Map() });
+      this.sessions.set(params.sessionId, { parent: sessionId, frameId: params.targetInfo.targetId, contexts: new Map() });
       this.initialize(params.sessionId);
     }
     if (method === 'Target.detachedFromTarget') this.remove(params.sessionId);
@@ -53,16 +55,24 @@ export class FrameTargets {
     // Diagnostics may have disabled Runtime while a dialog watch kept this
     // debugger attached. Restore context events before binding another ref.
     await this.command('', 'Runtime.enable');
+    for (const [sessionId, session] of this.sessions) if (sessionId && session.error) this.initialize(sessionId);
     const deadline = Date.now() + 1200;
     do {
       guard();
       for (const [sessionId, session] of this.sessions) {
         await session.ready;
-        if (session.error) throw session.error;
+        // One failing unrelated iframe (ads, detaching frames) must not block the rest.
+        if (session.error) { if (!sessionId) throw session.error; continue; }
         for (const c of session.contexts.values()) {
           guard();
+          let result;
           // uniqueContextId cannot be reused by a new document after navigation.
-          const result = await this.command(sessionId, 'Runtime.evaluate', { expression: 'globalThis.__codexBrowserBuddyRefsV3?.token', uniqueContextId: c.uniqueId, returnByValue: true });
+          try { result = await this.command(sessionId, 'Runtime.evaluate', { expression: 'globalThis.__codexBrowserBuddyRefsV3?.token', uniqueContextId: c.uniqueId, returnByValue: true }); }
+          catch {
+            // Destroyed while Runtime events were disabled or still in flight.
+            // Skip rather than forget it: a re-enable need not report it again.
+            this.alive(); continue;
+          }
           if (result.result?.value === token) {
             const route = { sessionId, contextId: c.uniqueId, frameId: c.auxData.frameId };
             this.assert(route); return route;
@@ -75,11 +85,19 @@ export class FrameTargets {
   }
   async project(route, point, guard) {
     this.assert(route);
-    const frames = new Map();
+    const frames = new Map(), skipped = new Set();
     for (const [sessionId, session] of this.sessions) {
       guard(); await session.ready;
-      if (session.error) throw session.error;
-      const { frameTree } = await this.command(sessionId, 'Page.getFrameTree');
+      // An unrelated failing target is skipped; walking through one stops below.
+      let frameTree;
+      try {
+        if (session.error) throw session.error;
+        ({ frameTree } = await this.command(sessionId, 'Page.getFrameTree'));
+      } catch (error) {
+        this.alive();
+        if (sessionId === route.sessionId) throw error;
+        skipped.add(sessionId ? session.frameId : ''); continue;
+      }
       const visit = (tree, parentId) => {
         // A frame may also appear in its parent's tree; its own target wins.
         if (!frames.get(tree.frame.id)?.targetRoot) frames.set(tree.frame.id, { ...tree.frame, parentId: tree.frame.parentId || parentId, sessionId, targetRoot: tree === frameTree });
@@ -94,7 +112,7 @@ export class FrameTargets {
       if (frame.targetRoot && frame.sessionId === route.sessionId) inputPoint = { ...projected };
       if (!frame.parentId) break;
       const parent = frames.get(frame.parentId);
-      if (!parent) throw new Error('FRAME_TARGET_UNAVAILABLE: Parent frame is unavailable');
+      if (!parent || skipped.has(parent.id) || skipped.has('')) throw new Error('FRAME_TARGET_UNAVAILABLE: Parent frame is unavailable');
       if (!inputPoint && (frame.securityOrigin !== parent.securityOrigin || !/^https?:\/\//.test(frame.securityOrigin))) {
         throw new Error('FRAME_ROUTING_UNAVAILABLE: Cross-origin frame has no dedicated Chrome input target; coordinate fallback is disabled');
       }
