@@ -1,0 +1,12 @@
+{
+  "name": "browser-use-local",
+  "interface": { "displayName": "Codex Browser Use 本地插件" },
+  "plugins": [
+    {
+      "name": "codex-browser-use",
+      "source": { "source": "local", "path": "./" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Productivity"
+    }
+  ]
+}

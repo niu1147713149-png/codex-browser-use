@@ -1,0 +1,26 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "codex-browser-use",
+  "version": "0.5.0",
+  "description": "通过本机 Chrome 扩展，让 Codex 操作新建或明确共享的标签页。",
+  "license": "MIT",
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Codex Browser Use",
+        "shortDescription": "连接你的 Chrome，在独立会话中浏览和操作网页",
+        "longDescription": "本地 Chrome 浏览器助手。支持网页快照、点击、填写、滚动、截图、会话隔离，以及随时暂停和释放标签页。独立实现，与 WorkBuddy 和 OpenAI 无隶属关系。",
+        "developerName": "Local tools",
+        "category": "Productivity",
+        "capabilities": [
+          "Read",
+          "Write"
+        ],
+        "brandColor": "#187566",
+        "defaultPrompt": [
+          "用 Codex Browser Use 在 Chrome 中打开网页并读取内容"
+        ]
+      }
+    }
+  }
+}

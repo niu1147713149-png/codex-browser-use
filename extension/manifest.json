@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Codex Browser Use",
+  "version": "0.5.0",
+  "description": "让 Codex 列出、接管和操作你指定的 Chrome 标签页。",
+  "minimum_chrome_version": "116",
+  "permissions": [
+    "tabs",
+    "tabGroups",
+    "scripting",
+    "debugger",
+    "nativeMessaging",
+    "storage",
+    "alarms",
+    "downloads"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Codex Browser Use",
+    "default_popup": "popup.html"
+  },
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyIOpglZSKDtJiDf9c2ni0Ws7hoGx1jrUrTMAYveXCKFaB+jodpBdtywDmqXXH3G3T/DHHcLaMpNC0t74m/RhGFeO+8lbh3hhlN3LGUFdxN65EC7o7YtOQdAJWenIFIO638ywRA3OXq22s73mc2l97/lva5WxWQQSbarPUx+n7DC2sgA9/C6VUvEygaCAkJtCchlaUmt+VkPVyfwJUDBFaysMv99+Ojd8Q1MiEmUlIKrnz8JWeWmDBRr1tdX3CoNV1fg7niLTHu5mlEBap77FqzxEhj7UCq86ueYPXSYs0UBwtwOMmtT5nDFhNUFWTjY0T8KYLsTyZCxj873B7YE9fwIDAQAB"
+}

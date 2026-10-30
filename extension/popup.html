@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex Browser Use</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <header>
+      <div class="brand-icon" aria-hidden="true">B<span>·</span></div>
+      <div class="brand"><h1>Codex Browser Use</h1><p>CHROME ↔ CODEX</p></div>
+      <span class="version">v0.5.0</span>
+    </header>
+    <section id="connection" class="connection" aria-live="polite">
+      <span class="dot" aria-hidden="true"></span>
+      <div><strong id="status">正在检查连接</strong><p id="detail">读取本机连接状态…</p></div>
+      <button id="reconnect" class="icon-button" aria-label="重新连接" title="重新连接">↻</button>
+    </section>
+    <section class="share-section" aria-label="共享当前标签页">
+      <div class="section-title"><h2>把当前页面交给 Codex</h2><span class="local-label">仅本机</span></div>
+      <label class="sr-only" for="session-select">选择共享到的会话</label>
+      <select id="session-select"><option value="">先在 Codex 创建浏览器会话</option></select>
+      <button id="share" class="primary" disabled>共享当前标签页 <span aria-hidden="true">↗</span></button>
+      <p class="hint">也可以直接在 Codex 中说“操作某个标签页”，由插件接管你指定的页面。</p>
+      <p id="profile-label" class="hint"></p>
+    </section>
+    <section class="session-section" aria-labelledby="sessions-heading">
+      <div class="section-title"><h2 id="sessions-heading">活跃会话</h2><span id="count" class="count">0</span></div>
+      <div id="sessions"><div class="empty"><strong>正在读取会话</strong><p>连接后会在这里显示受控标签页。</p></div></div>
+    </section>
+    <p id="notice" class="notice" role="status" hidden></p>
+    <footer><span>你随时拥有控制权</span><button id="pause" class="text-button">暂停控制</button></footer>
+  </main>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

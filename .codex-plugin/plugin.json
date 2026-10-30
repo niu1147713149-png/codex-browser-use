@@ -1,0 +1,18 @@
+{
+  "name": "codex-browser-use",
+  "version": "0.5.0",
+  "description": "本机 Chrome 浏览器控制与会话隔离",
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Codex Browser Use",
+    "shortDescription": "让 Codex 操作明确共享的 Chrome 标签页",
+    "developerName": "Local tools",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "brandColor": "#187566"
+  }
+}

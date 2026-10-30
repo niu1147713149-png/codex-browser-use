@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "browser-use": {
+      "command": "node",
+      "args": ["${PLUGIN_ROOT}/src/mcp-server.mjs"],
+      "cwd": "${PLUGIN_ROOT}"
+    }
+  }
+}
