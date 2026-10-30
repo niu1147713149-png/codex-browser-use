@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BrowserController, safeUrl, keyDefinition } from '../extension/controller.js';
+import { interact } from '../extension/interactions.js';
 
 export function fakeChrome() {
   const tabs = new Map([[5, { id: 5, title: 'User tab', url: 'https://example.com/private', windowId: 1, index: 0, active: true, status: 'complete', groupId: -1 }]]);
@@ -127,4 +128,26 @@ test('Batch stops after a failure and pause or debugger cancellation revokes pen
   await assert.rejects(c.execute('tabs.get', { ...a, tabId: 5 }, { expiresAt: Date.now() - 1 }), /expired/);
   await c.debuggerDetached({ tabId: 5 }, 'canceled_by_user');
   await assert.rejects(c.execute('tabs.get', { ...a, tabId: 5 }), /not shared/);
+});
+
+test('Iframe clicks use only frame-local coordinates and the browser-owned route', async () => {
+  const { api } = fakeChrome();
+  const c = new BrowserController(api);
+  await c.share(5, (await c.execute('session.start', { name: 'frames' })).sessionId);
+  c.refs.set(5, new Map([['f9/e1', { frameId: 9, documentId: 'child', localRef: 'e1' }]]));
+  const route = { sessionId: 'child', contextId: 'doc-context', frameId: 'cdp-frame' };
+  const projected = { x: 210, y: 220, inputPoint: { x: 10, y: 20 }, route, modifiers: 8, type: 'mousePressed' };
+  c.page = async (_tab, action) => {
+    if (action === 'path') return { token: 'isolated-token' };
+    return { x: 10, y: 20 };
+  };
+  const sent = [];
+  const send = async (method, params, target) => sent.push({ method, params, target });
+  send.framePoint = async (token, point) => { assert.equal(token, 'isolated-token'); assert.deepEqual(point, { x: 10, y: 20 }); return projected; };
+  c.withDebugger = async (_tab, run) => run(send);
+  const result = await interact(c, 'tab.click', 5, { ref: 'f9/e1', timeoutMs: 0 }, () => {}, keyDefinition);
+  assert.equal(result.status, 'sent'); assert.equal(result.x, 210); assert.equal(result.y, 220); assert.equal(result.route, undefined);
+  assert.deepEqual(sent.map(e => e.params.type), ['mouseMoved', 'mousePressed', 'mouseReleased']);
+  for (const e of sent) { assert.equal(e.target, route); assert.equal(e.params.x, 10); assert.equal(e.params.y, 20); assert.equal(e.params.modifiers, undefined); assert.equal(e.params.route, undefined); }
+  await assert.rejects(c.point(5, { ref: 'f9/e1' }), /FRAME_TARGET_UNAVAILABLE/);
 });

@@ -128,10 +128,11 @@ export class TaskJournal {
     task.steps.push(step); task.updatedAt = now();
     try { await this.save(); } catch (error) { task.steps.pop(); throw error; }
     if (before.matched) return { status: 'confirmed', changed: false, skipped: true, reason: 'desired_result_already_present', taskId: task.id, stepId: step.id };
-    let result;
+    let result, dispatching = false;
     try {
       // Recheck after durable intent is written, immediately before dispatch.
       await this.checkContext(task, args, guard);
+      dispatching = true;
       result = await this.c.execute(command, { ...args.args, sessionId: args.sessionId, tabId: args.tabId }, context);
       const verification = await waitFor(this.c, args.tabId, condition, args.args.timeoutMs ?? 3000, guard);
       guard();
@@ -139,7 +140,20 @@ export class TaskJournal {
       const sameAccount = (!task.requireSignedIn || account.status === 'signed_in') && (!task.accountFingerprint || account.account?.fingerprint === task.accountFingerprint);
       step.state = result.status !== 'uncertain' && verification.matched && sameAccount && account.origin === task.origin ? 'confirmed' : 'uncertain';
       step.verifiedBy = step.state === 'confirmed' ? 'postcondition' : undefined;
-    } catch {
+    } catch (error) {
+      // Only drop the intent before input or any effectful preparation.
+      if (!dispatching || args.action === 'wait' || error?.inputSent === false) {
+        const index = task.steps.indexOf(step);
+        task.steps.splice(index, 1); task.updatedAt = now();
+        try { await this.save(); }
+        catch {
+          // Keep memory consistent with the durable running intent. A failed
+          // removal must not permit a new step or advertise a safe retry.
+          step.state = 'uncertain'; task.steps.splice(index, 0, step);
+          return { status: 'uncertain', taskId: task.id, stepId: step.id, note: 'No page input was sent, but checkpoint removal failed. The unresolved intent was retained; inspect before recovery.' };
+        }
+        throw new Error(`STEP_NOT_SENT: ${error?.message || 'Step failed'}. No input or page preparation was sent and the checkpoint was removed; correct the request and retry.`);
+      }
       // Even if the response was lost after a click, the durable intent survives.
       step.state = 'uncertain';
     }

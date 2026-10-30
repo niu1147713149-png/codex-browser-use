@@ -154,7 +154,8 @@ export function validateCommand(method, args) {
     if (args.action === 'handle' && args.accept === undefined) throw new Error('Dialog handle requires explicit accept');
     if (args.action !== 'handle' && (args.accept !== undefined || args.promptText !== undefined)) throw new Error('Dialog response only belongs to handle');
   }
-  if (method === 'tab.upload' && args.files.some(p => !/^(?:[A-Za-z]:[\\/]|\/)/.test(p) || p.includes('\u0000'))) throw new Error('Upload requires absolute local file paths');
+  // Reject UNC/device paths (//host, /\host, \\?\): opening them on Windows contacts a remote host.
+  if (method === 'tab.upload' && args.files.some(p => !/^(?:[A-Za-z]:[\\/]|\/)/.test(p) || /^[\\/]{2}/.test(p) || p.includes('\u0000'))) throw new Error('Upload requires absolute local file paths');
   if (method === 'tab.download' && args.filename !== undefined && (!args.filename || /(^[\\/]|^[A-Za-z]:|(^|[\\/])\.\.([\\/]|$)|[\x00-\x1f])/.test(args.filename))) throw new Error('Download filename must be relative without parent traversal');
   if (method === 'tab.screenshot' && args.fullPage && args.clip) throw new Error('Use fullPage or clip, not both');
   if (method === 'tab.navigate' && args.action === 'goto' && !args.url) throw new Error('goto requires url');

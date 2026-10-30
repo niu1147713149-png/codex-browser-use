@@ -147,6 +147,7 @@ export function pageAction(action, args = {}) {
     if (action === 'path') return { path: pathFor(target), token: state.token, tag: target.tagName, id: target.id, type: target.getAttribute('type'), ax: state.refs.get(args.ref)?.ax };
     if (target && !visible(target) && action !== 'fileInfo') throw new Error('ELEMENT_NOT_VISIBLE: Element is no longer visible');
     if (target && disabled(target)) throw new Error('ELEMENT_DISABLED: Element is disabled');
+    if (action === 'ready') return { ready: true };
     if (action === 'unchanged') {
       if (args.operation === 'fill') {
         if (target.type === 'password') throw new Error('Enter passwords directly in Chrome');
@@ -161,7 +162,7 @@ export function pageAction(action, args = {}) {
       return { matches: target.value === args.value && (!target.multiple || target.selectedOptions.length === 1) };
     }
     if (action === 'click') {
-      target.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+      if (args._scroll !== false) target.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
       const box = target.getBoundingClientRect();
       const left = Math.max(0, box.left), right = Math.min(innerWidth, box.right), topY = Math.max(0, box.top), bottom = Math.min(innerHeight, box.bottom);
       if (right <= left || bottom <= topY) throw new Error('ELEMENT_NOT_VISIBLE: No clickable area in viewport');

@@ -11,6 +11,7 @@ import { advancedFixture } from './advanced-fixture.mjs';
 import { advancedChecks } from './advanced-checks.mjs';
 import { reliabilityRoute } from './reliability-fixture.mjs';
 import { reliabilityChecks } from './reliability-checks.mjs';
+import { frameFixture, frameChecks } from './frame-checks.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const output = join(root, 'output', 'playwright');
@@ -42,7 +43,7 @@ const server = http.createServer(async (req, res) => {
     res.end('{}'); return;
   }
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  const advanced = advancedFixture(req.url, server.address().port);
+  const advanced = advancedFixture(req.url, server.address().port) || frameFixture(req.url, server.address().port);
   if (advanced) { res.end(advanced); return; }
   res.end(req.url === '/next' ? '<!doctype html><title>第二页</title><h1>导航已完成</h1><a href="/fixture">返回测试</a>' : fixture);
 });
@@ -112,7 +113,7 @@ const checks = [];
 try {
   context = await chromium.launchPersistentContext(join(runDir, 'profile'), {
     headless: true, channel: 'chromium', viewport: { width: 1000, height: 760 }, deviceScaleFactor: 1.5, downloadsPath: join(runDir, 'downloads'),
-    args: [`--disable-extensions-except=${stage}`, `--load-extension=${stage}`]
+    args: ['--site-per-process', `--disable-extensions-except=${stage}`, `--load-extension=${stage}`]
   });
   // Leave dialogs pending for Codex Browser Use; Playwright otherwise auto-dismisses them.
   context.on('dialog', () => {});
@@ -163,6 +164,26 @@ try {
   checks.push('Navigation and history');
 
   checks.push(...await advancedChecks(call, base, output));
+  const atFramePress = async (tabId, action) => {
+    const worker = context.serviceWorkers().find(w => w.url().startsWith(`chrome-extension://${extensionId}/`));
+    await worker.evaluate(id => {
+      const original = chrome.debugger.sendCommand;
+      globalThis.restoreFixtureInput = () => { chrome.debugger.sendCommand = original; delete globalThis.restoreFixtureInput; };
+      chrome.debugger.sendCommand = async (target, method, params) => {
+        if (target.tabId === id && method === 'Input.dispatchMouseEvent' && params.type === 'mousePressed') {
+          globalThis.restoreFixtureInput();
+          await chrome.scripting.executeScript({ target: { tabId: id, frameIds: [0] }, func: () => {
+            document.querySelector('iframe').style.pointerEvents = 'none';
+            document.getElementById('switched').textContent = 'Switched at press';
+          } });
+        }
+        return original.call(chrome.debugger, target, method, params);
+      };
+    }, tabId);
+    try { return await action(); }
+    finally { await worker.evaluate(() => globalThis.restoreFixtureInput?.()); }
+  };
+  checks.push(...await frameChecks(call, base, atFramePress));
   checks.push(...await reliabilityChecks(call, base, output, { downloadRoot: runDir }));
 
   const existing = await context.newPage();

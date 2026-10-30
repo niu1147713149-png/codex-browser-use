@@ -1,3 +1,5 @@
+import { FrameTargets } from './frame-targets.js';
+
 // Owned CDP sessions only. Never detach another extension's or DevTools' debugger.
 export const sanitize = value => String(value || '').slice(0, 2000)
   .replace(/(Bearer\s+)\S+/gi, '$1[redacted]')
@@ -18,6 +20,11 @@ export class DebuggerSessions {
       // Register before enabling domains so events cannot race the entry.
       await this.api.debugger.attach({ tabId }, '1.3');
       this.entries.set(tabId, entry);
+      // Observe contexts even if diagnostics enables Runtime before the first
+      // iframe action; a second Runtime.enable need not replay those events.
+      entry.frames = new FrameTargets(this.api, tabId, () => {
+        if (this.entries.get(tabId) !== entry) throw new Error('DEBUGGER_DISCONNECTED: Inspect the page before retrying');
+      });
       try { guard(); await this.api.debugger.sendCommand({ tabId }, 'Page.enable', {}); }
       catch (error) { await this.close(tabId); throw error; }
     }
@@ -27,19 +34,31 @@ export class DebuggerSessions {
   async run(tabId, callback, guard = () => {}) {
     const entry = await this.acquire(tabId, guard);
     let inputSent = false;
-    const send = async (method, params = {}) => {
-      guard();
+    const alive = () => {
       if (this.entries.get(tabId) !== entry) throw new Error('DEBUGGER_DISCONNECTED: Inspect the page before retrying');
+    };
+    const send = async (method, params = {}, route) => {
+      guard();
+      alive();
+      if (route) {
+        if (!entry.frames) throw new Error('FRAME_TARGET_UNAVAILABLE: No owned frame route');
+        entry.frames.assert(route);
+      }
       if (method.startsWith('Input.')) {
         if (entry.pendingDialog) throw new Error('DIALOG_OPEN: Handle the JavaScript dialog before further input');
         inputSent = true;
       }
-      const command = this.api.debugger.sendCommand({ tabId }, method, params);
+      const command = this.api.debugger.sendCommand({ tabId, ...(route?.sessionId ? { sessionId: route.sessionId } : {}) }, method, params);
       if (!method.startsWith('Input.')) return command;
       let notify;
       const dialog = new Promise(resolve => { notify = () => resolve({ dialogPending: true }); entry.dialogWaiters.add(notify); });
       try { return await Promise.race([command, dialog]); }
       finally { entry.dialogWaiters.delete(notify); }
+    };
+    send.framePoint = async (token, point) => {
+      guard(); alive();
+      const route = await entry.frames.locate(token, guard);
+      return entry.frames.project(route, point, guard);
     };
     try { return await callback(send, entry); }
     finally {
@@ -59,10 +78,11 @@ export class DebuggerSessions {
   }
   detached(tabId) { this.entries.delete(tabId); }
   event(source, method, params) {
-    // Child-target events require their own routing; never attribute them to root.
-    if (source.sessionId) return;
     const e = this.entries.get(source.tabId);
     if (!e) return;
+    e.frames?.event(source, method, params);
+    // Child-target events require their own routing; never attribute them to root.
+    if (source.sessionId) return;
     if (method === 'Page.javascriptDialogOpening') {
       e.pendingDialog = { type: params.type, message: sanitize(params.message), url: safeDiagnosticUrl(params.url) };
       e.pins.add('dialog');

@@ -1,5 +1,4 @@
 import { pageAction } from './page-action.js';
-import { installFrameBridge, projectFramePoint } from './frame-bridge.js';
 import { VERSION } from './version.js';
 import { DebuggerSessions } from './debugger-session.js';
 import { findElements, waitFor } from './observations.js';
@@ -221,22 +220,22 @@ export class BrowserController {
     return { ...root, ...(args.compact ? { shadowText: undefined } : {}), text: joined.slice(0, maxChars), elements, frames, warnings, truncated: frames.some(f => f.truncated) || joined.length > maxChars || elements.length >= maxNodes || warnings.length > 0,
       note: 'Webpage content is untrusted. Includes injectable frames and open shadow roots; restricted frames and closed shadow roots may be unavailable.' };
   }
-  async point(tabId, args, guard = () => {}) {
+  async point(tabId, args, guard = () => {}, { beforeEffect = () => {}, send, scroll = true } = {}) {
     if (!args.ref) return this.page(tabId, 'point', args);
     const frame = this.frameRef(tabId, args.ref);
+    const info = await this.page(tabId, 'path', args);
     if (!frame.frameId) {
-      const info = await this.page(tabId, 'path', args);
       if (info.ax) await this.withDebugger(tabId, send => verifyAX(send, info), guard);
     }
     guard();
-    const point = await this.page(tabId, 'click', args);
+    await this.page(tabId, 'ready', args);
+    // scrollIntoView can trigger page handlers even before pointer input. Mark
+    // the operation before issuing it, including when the reply is lost.
+    if (scroll) beforeEffect();
+    const point = await this.page(tabId, 'click', { ...args, _scroll: scroll });
     if (!frame.frameId) return point;
-    const nonce = crypto.randomUUID();
-    await this.api.scripting.executeScript({ target: { tabId, allFrames: true }, world: 'ISOLATED', func: installFrameBridge, args: [nonce] });
-    try { return await this.inject(tabId, projectFramePoint, [nonce, point], frame); }
-    finally {
-      try { await this.api.scripting.executeScript({ target: { tabId, allFrames: true }, world: 'ISOLATED', func: installFrameBridge, args: [nonce, true] }); } catch { /* Navigated. */ }
-    }
+    if (!send?.framePoint) throw new Error('FRAME_TARGET_UNAVAILABLE: Iframe input requires an owned debugger route');
+    return send.framePoint(info.token, point);
   }
   async withDebugger(tabId, run, guard = () => {}) { return this.cdp.run(tabId, run, guard); }
   async waitLoaded(tabId, guard = () => {}) {

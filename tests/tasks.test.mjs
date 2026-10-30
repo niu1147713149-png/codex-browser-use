@@ -33,6 +33,7 @@ function fixture() {
     const execute = c.execute.bind(c);
     c.execute = async (method, args, context) => {
       if (method !== 'tab.click') return execute(method, args, context);
+      if (state.notSent) { if (state.onNotSent) state.onNotSent(); const error = new Error(state.notSent); error.inputSent = false; throw error; }
       state.clicks++; state.text = 'Submitted once';
       if (state.afterClick) await state.afterClick(c, args);
       return { status: 'confirmed' };
@@ -174,5 +175,31 @@ test('A different page on the same site/account cannot silently receive resumed 
   f.tabs.get(1).url = 'https://example.com/another-order';
   await assert.rejects(c.execute('tab.task', { ...scope, action: 'resume' }), /TASK_PAGE_CHANGED/);
   await assert.rejects(c.execute('tab.taskStep', f.step(scope)), /TASK_PAGE_CHANGED/);
+  assert.equal(f.state.clicks, 0);
+});
+
+test('A step that fails before input is not recorded and can be corrected and retried', async () => {
+  const f = fixture(), c = f.controller(), scope = await f.start(c);
+  f.state.notSent = 'ELEMENT_NOT_FOUND: No element matches the locator';
+  await assert.rejects(c.execute('tab.taskStep', f.step(scope)), /STEP_NOT_SENT: ELEMENT_NOT_FOUND/);
+  assert.equal(f.state.clicks, 0);
+  assert.equal(f.local.browserTasksV1[0][1].steps.length, 0);
+  f.state.notSent = undefined;
+  assert.equal((await c.execute('tab.taskStep', f.step(scope))).status, 'confirmed');
+  assert.equal(f.state.clicks, 1);
+  assert.equal((await c.execute('tab.task', { ...scope, action: 'finish' })).state, 'complete');
+});
+
+test('A failed pre-input checkpoint removal retains the unresolved intent in memory and storage', async () => {
+  const f = fixture(), c = f.controller(), scope = await f.start(c);
+  f.state.notSent = 'ELEMENT_NOT_FOUND: Missing';
+  f.state.onNotSent = () => { f.state.failWrite = true; };
+  const result = await c.execute('tab.taskStep', f.step(scope));
+  assert.equal(result.status, 'uncertain'); assert.match(result.note, /checkpoint removal failed/);
+  assert.equal(f.state.clicks, 0); assert.equal(f.local.browserTasksV1[0][1].steps.length, 1);
+  assert.equal((await c.execute('tab.taskStep', f.step(scope))).deduplicated, true);
+  await assert.rejects(c.execute('tab.taskStep', { ...f.step(scope), stepId: 'new' }), /UNRESOLVED_STEP/);
+  const restored = f.controller(); await restored.restore();
+  assert.equal((await restored.execute('tab.taskStep', f.step(scope))).status, 'uncertain');
   assert.equal(f.state.clicks, 0);
 });

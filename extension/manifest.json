@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Codex Browser Use",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "让 Codex 列出、接管和操作你指定的 Chrome 标签页。",
-  "minimum_chrome_version": "116",
+  "minimum_chrome_version": "125",
   "permissions": [
     "tabs",
     "tabGroups",

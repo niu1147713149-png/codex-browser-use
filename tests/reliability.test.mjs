@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validateCommand } from '../src/tools.mjs';
 import { DebuggerSessions } from '../extension/debugger-session.js';
-import { mutation } from '../extension/interactions.js';
+import { mutation, interact } from '../extension/interactions.js';
+import { keyDefinition } from '../extension/controller.js';
 import { waitFor } from '../extension/observations.js';
 
 const scope = { sessionId: 'test-session', tabId: 5 };
@@ -14,6 +15,10 @@ test('Semantic actions and nested conditions reject ambiguous parameter contract
   assert.throws(() => validateCommand('tab.wait', { ...scope, condition: { state: 'complete' }, timeoutMs: 25000 }), /range/);
   assert.throws(() => validateCommand('tab.dialog', { ...scope, action: 'handle' }), /explicit accept/);
   assert.throws(() => validateCommand('tab.upload', { ...scope, ref: 'file', files: ['relative.txt'] }), /absolute/);
+  for (const unc of ['//attacker.example/share/x.txt', '/\\attacker.example\\share\\x.txt', '\\\\?\\C:\\x.txt']) {
+    assert.throws(() => validateCommand('tab.upload', { ...scope, ref: 'file', files: [unc] }), /absolute/);
+  }
+  assert.doesNotThrow(() => validateCommand('tab.upload', { ...scope, ref: 'file', files: ['C:/a.txt', '/tmp/a.txt'] }));
   assert.throws(() => validateCommand('tab.download', { ...scope, url: 'https://example.com/file', filename: '../overwrite' }), /relative/);
   assert.throws(() => validateCommand('tab.batch', { ...scope, actions: [{ action: 'check', args: { locator: { label: 'Agree' }, checked: true, tabId: 6 } }] }), /override/);
   assert.doesNotThrow(() => validateCommand('tab.click', { ...scope, locator: { role: 'button', name: 'Save' }, expect: { state: 'url', value: 'https://example.com/done' } }));
@@ -63,6 +68,30 @@ test('Mutation failure after dispatch is uncertain and never replays input', asy
   await assert.rejects(mutation({}, 5, {}, () => {}, async () => { throw new Error('Target not ready'); }), /Target not ready/);
 });
 
+test('A lost mouse-move response in click or drag is already uncertain, never a pre-input retry', async () => {
+  for (const method of ['tab.click', 'tab.drag']) {
+    const sent = [];
+    const c = {
+      point: async () => ({ x: 10, y: 20 }), page: async () => ({}),
+      withDebugger: async (_tab, run) => run(async (_method, params) => { sent.push(params.type); throw new Error('Move response lost after page handler ran'); })
+    };
+    const result = await interact(c, method, 5, { x: 10, y: 20, points: [{ x: 10, y: 20 }, { x: 30, y: 40 }] }, () => {}, keyDefinition);
+    assert.equal(result.status, 'uncertain'); assert.equal(result.actionSent, true);
+    assert.deepEqual(sent, ['mouseMoved']);
+  }
+});
+
+test('A ref that changes meaning after hover stops before press and remains uncertain', async () => {
+  let moved = false;
+  const sent = [];
+  const c = {
+    point: async () => { if (moved) throw new Error('STALE_REF: Meaning changed'); return { x: 10, y: 20 }; },
+    withDebugger: async (_tab, run) => run(async (_method, params) => { sent.push(params.type); moved = true; })
+  };
+  const result = await interact(c, 'tab.click', 5, { ref: 'ref' }, () => {}, keyDefinition);
+  assert.equal(result.status, 'uncertain'); assert.match(result.error, /STALE_REF/); assert.deepEqual(sent, ['mouseMoved']);
+});
+
 test('Condition waiting observes revocation instead of confirming a late read', async () => {
   let revoked = false;
   const controller = { cdp: { entries: new Map() }, page: async () => { revoked = true; return { text: 'done' }; } };
@@ -75,4 +104,19 @@ test('A fulfilled page condition cannot hide a failed input value verification',
     sent(); return { status: 'uncertain', verification: { matched: false, observed: { value: '' } } };
   });
   assert.equal(result.status, 'uncertain'); assert.equal(result.inputVerification.matched, false); assert.equal(result.verification.matched, true);
+});
+
+test('Key presses never insert characters into a focused password field', async () => {
+  let password = true;
+  const sent = [];
+  const c = {
+    withDebugger: async (_tab, run) => run(async (method, params) => sent.push([method, params.key])),
+    api: { scripting: { executeScript: async () => [{ frameId: 0, result: { ok: true, value: { focused: true, password } } }] } }
+  };
+  await assert.rejects(interact(c, 'tab.press', 5, { key: 'a' }, () => {}, keyDefinition), /password/i);
+  assert.equal(sent.length, 0);
+  assert.equal((await interact(c, 'tab.press', 5, { key: 'Enter' }, () => {}, keyDefinition)).status, 'sent');
+  password = false;
+  assert.equal((await interact(c, 'tab.press', 5, { key: 'a' }, () => {}, keyDefinition)).status, 'sent');
+  assert.equal(sent.length, 4);
 });

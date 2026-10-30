@@ -49,16 +49,16 @@ export async function resolveTarget(c, tabId, args, guard, includeHidden = false
   return { ...rest, ref: found.elements[0].ref };
 }
 
-export async function waitPoint(c, tabId, args, guard) {
+export async function waitPoint(c, tabId, args, guard, beforeEffect, send) {
   const deadline = Date.now() + (args.timeoutMs ?? 5000);
   for (;;) {
     guard();
     try {
       const resolved = await resolveTarget(c, tabId, args, guard);
-      const first = await c.point(tabId, resolved, guard);
+      const first = await c.point(tabId, resolved, guard, { beforeEffect, send });
       if (!resolved.ref) return { resolved, point: first };
       await delay(60); guard();
-      const point = await c.point(tabId, resolved, guard);
+      const point = await c.point(tabId, resolved, guard, { beforeEffect, send, scroll: false });
       if (Math.abs(first.x - point.x) > 1 || Math.abs(first.y - point.y) > 1) throw new Error('ELEMENT_MOVING: Target is still moving');
       return { resolved, point };
     } catch (error) {

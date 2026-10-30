@@ -1,6 +1,6 @@
 # 登录环境、减少重复操作与任务恢复
 
-0.5.0 使用安装扩展的原生 Chrome 配置。Cookie、本地存储和网站的刷新机制仍由 Chrome 与网站管理，不导出 Cookie，也不改变登录有效期。不同浏览器会话隔离的是标签归属，仍共享同一配置中的网站登录状态。
+0.5.x 使用安装扩展的原生 Chrome 配置。Cookie、本地存储和网站的刷新机制仍由 Chrome 与网站管理，不导出 Cookie，也不改变登录有效期。不同浏览器会话隔离的是标签归属，仍共享同一配置中的网站登录状态。
 
 ## 观察与操作
 
@@ -36,7 +36,7 @@
 2. `browser_task(action:create,name,requireSignedIn:true,accountRules?)` 返回 `taskId`；保存到本聊天。普通无需登录任务可省略 requireSignedIn。创建时能确认身份的任务会绑定该身份；否则返回 `login_status_only` 或 `profile_and_origin`，不能当作已绑定某账号。
 3. 对重要步骤调用 `browser_task_step(taskId,stepId,action,args)`。它先检查期望结果，已经满足就跳过；否则先持久保存意图，再发送动作并验证。不同步骤用不同 stepId，同一步重复请求保持相同 ID 与参数。
 4. 点击、双击、追加文字和按键必须提供有区分度的 `args.expect`；填值、选择、勾选和 goto 可自动推导结果条件。使用语义 locator，不接受失效的文档 ref 或坐标。页面已加载不是充分的成功条件。
-5. 同一步重复请求返回历史状态且 `actionsReplayed:0`。即使当前页面后来变化，也不会自动重放已完成步骤。`uncertain` 会阻止后续步骤；先检查页面，再用 `browser_task(action:verify,stepId,condition)` 核对**原来的同一个结果条件**。核对失败保持未解决状态。
+5. 同一步重复请求返回历史状态且 `actionsReplayed:0`。即使当前页面后来变化，也不会自动重放已完成步骤。`uncertain` 会阻止后续步骤；先检查页面，再用 `browser_task(action:verify,stepId,condition)` 核对**原来的同一个结果条件**。核对失败保持未解决状态。没有发送输入或准备阶段滚动等操作的失败（例如定位不到元素），在成功撤销检查点后返回 `STEP_NOT_SENT`；修正请求后可用同一 stepId 重试。鼠标移动/悬停、拖拽首个移动、准备滚动都可能触发页面行为，其后的失败保留 `uncertain`；撤销检查点写入失败同样保留未解决状态，不能当作未记录而重试。
 6. 原会话仍在时可以直接继续。扩展重载/Chrome 重启后，新建 session、重新列出并接管该任务页面，再调用 `browser_task(action:resume,taskId)`。它核对配置、网站 origin 和已绑定的账号证据，不自动导航、不重新发送步骤。原会话仍占用目标页时不允许另一个会话接管任务。
 7. 全部步骤已确认后 `finish`；需要清理该检查点时 `discard`，不会更改网页。释放或关闭测试页仍使用正常标签工具。
 

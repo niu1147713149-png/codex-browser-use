@@ -19,7 +19,7 @@ export class BrowserClient {
       this.child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
     });
   }
-  async init() { await this.rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'browser-use-media', version: '0.5.0' } }); return this; }
+  async init() { await this.rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'browser-use-media', version: '0.5.1' } }); return this; }
   async call(name, args = {}) {
     const response = await this.rpc('tools/call', { name, arguments: args });
     if (response.error || response.result?.isError) throw new Error(response.error?.message || response.result.content[0].text);

@@ -36,7 +36,7 @@ ref 在同文档重复快照、滚动和 history 变化后保持稳定；节点�
 
 动作可传 `expect:{state:...}` 和 `timeoutMs`。支持 visible/hidden/attached/detached/enabled/disabled/value/checked/text/text_gone/url/complete；元素条件必须传 ref 或 locator，正文传 text，URL/输入值传 value。独立 `browser_wait` 用 condition 字段。点击等待可见、可用、无遮挡与位置稳定；发送后只轮询结果，不重发动作。`sent` 表示已发送，`confirmed` 表示指定条件或实际字段状态成立，`uncertain` 表示无法确认；选能区分操作前后的条件。uncertain 后先读页面，不盲目重试。
 
-`browser_double_click` 双击，`browser_move` 悬停，`browser_drag` 按坐标路径拖拽，`browser_scroll` 滚动网页或元素。`browser_type` 在聚焦输入框插入文字；`browser_fill` 替换全部文字；`browser_press` 支持 Enter、Tab、Escape、方向键和 Ctrl+A 等组合键。鼠标、文字输入、键盘和截图均走本插件的 Chrome debugger 通道。跨域及嵌套 iframe 可读取和定位；关闭的 Shadow DOM、受限 frame 无法保证读取，旋转/3D 变换的 iframe 可改用截图坐标。密码由用户在 Chrome 输入。
+`browser_double_click` 双击，`browser_move` 悬停，`browser_drag` 按坐标路径拖拽，`browser_scroll` 滚动网页或元素。`browser_type` 在聚焦输入框插入文字；`browser_fill` 替换全部文字；`browser_press` 支持 Enter、Tab、Escape、方向键和 Ctrl+A 等组合键。鼠标、文字输入、键盘和截图均走本插件的 Chrome debugger 通道。需要 Chrome 125+；跨域及嵌套 iframe 可读取和定位，原生鼠标输入绑定 Chrome 文档与子目标。同一输入目标内仅转换同源 frame 坐标；`FRAME_ROUTING_UNAVAILABLE` 表示跨域 frame 无法安全绑定输入目标，应停止该操作并说明限制，不自动改用父页面截图坐标重试。关闭的 Shadow DOM、受限 frame 无法保证读取，旋转/3D 变换的 iframe 不支持 ref 点击。密码由用户在 Chrome 输入。
 
 `browser_screenshot` 支持视口、`fullPage:true`、`clip` 和 PNG/JPEG。图片可能缩放：图片像素除以 `cssScale`，加上 `documentClip.x/y` 再减 `viewport.scrollX/Y`，才是鼠标工具使用的视口 CSS 坐标。页面外的目标先滚动再取新截图。坐标操作不能凭猜测。
 

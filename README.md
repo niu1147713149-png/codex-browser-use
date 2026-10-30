@@ -2,7 +2,7 @@
 
 让 Codex 操作你已经登录的 Chrome：读取网页、填写表单、查看视频画面和声音，在操作前定位目标、操作后核对结果，并减少重复输入与提交。
 
-**0.5.0 · Windows + Chrome · 42 个 MCP 工具 · MIT**
+**0.5.1 · Windows + Chrome · 42 个 MCP 工具 · MIT**
 
 Connect Codex to your existing Chrome profile through a local extension and Native Messaging bridge. Keep your browser login sessions, control explicitly selected tabs, and verify actions before continuing.
 
@@ -24,7 +24,7 @@ Connect Codex to your existing Chrome profile through a local extension and Nati
 
 ## 安装
 
-需要 Windows、Chrome 116+、Node.js 22+，以及支持 `codex plugin` 的 Codex CLI。先确认 `node --version`、`codex --version` 和 `codex plugin --help` 可用。浏览器控制运行时仅使用 Node.js 标准库，不需要 `npm install` 或额外 API Key。
+需要 Windows、Chrome 125+、Node.js 22+，以及支持 `codex plugin` 的 Codex CLI。Chrome 125+ 提供 iframe 原生输入所需的子目标调试接口。先确认 `node --version`、`codex --version` 和 `codex plugin --help` 可用。浏览器控制运行时仅使用 Node.js 标准库，不需要 `npm install` 或额外 API Key。
 
 1. 下载仓库 ZIP 或发布包并解压，也可以克隆仓库。将项目放在准备长期保留的目录中，在含有 `package.json` 的项目根目录打开 PowerShell。
 2. 运行安装脚本：
@@ -89,7 +89,7 @@ Codex → MCP stdio → 本机 127.0.0.1 接口 → Native Messaging → Chrome 
 ## 能力边界
 
 - 当前安装器支持 **Windows + Chrome**；macOS/Linux 安装尚未实现。一次连接一个 Chrome 配置，多个配置同时加载时连接最近就绪的那个。重连可用 `expectedProfileId` 核对配置。
-- 不操作 `chrome://`、`file://`、浏览器权限窗或系统弹窗。关闭 Shadow DOM、受限 iframe、旋转/3D 变换 iframe 无法保证读取或精确定位。Chrome AX 和文件选择暂限顶层文档；iframe 仍支持 DOM 读取与操作。
+- 不操作 `chrome://`、`file://`、浏览器权限窗或系统弹窗。关闭 Shadow DOM、受限 iframe、旋转/3D 变换 iframe 无法保证读取或精确定位。Chrome AX 和文件选择暂限顶层文档；iframe 支持 DOM 读取，以及绑定 Chrome 子目标的原生鼠标操作。同一输入目标内仅转换同源 frame 坐标；跨域 frame 缺少独立输入目标时返回 `FRAME_ROUTING_UNAVAILABLE`，不回退到父页面坐标点击。
 - 不提供任意 JavaScript、Cookie 导出或密码读取接口。密码和验证码由用户在原网页流程中完成。发布、发送、支付等操作需要对应任务授权。
 - `sent` 只表示输入已发送；`confirmed` 表示结果条件成立；`uncertain` 必须先检查页面，不能盲目重试。暂停不会撤回已经发生的操作。任务检查点不是无人值守调度器。
 - 视频采用实际画面采样与音轨采集，不保证逐帧观看或全平台可用。DRM、CORS、后台暂停和网页播放器差异会限制能力；可选 ASR 需要 Python、依赖库及本地模型。评论读取限于页面实际加载的内容。

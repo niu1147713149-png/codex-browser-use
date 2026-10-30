@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "codex-browser-use",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "通过本机 Chrome 扩展，让 Codex 操作新建或明确共享的标签页。",
   "license": "MIT",
   "extensions": {

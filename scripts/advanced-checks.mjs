@@ -71,6 +71,16 @@ export async function advancedChecks(call, base, output) {
     assert.equal(get('Frame text').value, '跨域输入');
     checks.push('跨域及两层嵌套 iframe 读取、可信点击、原生输入');
 
+    await call('browser_navigate', { ...args, action: 'goto', url: `${base}/hijack` });
+    snap = await call('browser_snapshot', args);
+    assert.equal((await call('browser_click', { ...args, ref: get('Frame deny').ref })).status, 'sent');
+    snap = await call('browser_snapshot', args);
+    assert.match(snap.text, /Parent untouched/); assert.match(snap.text, /Deny clicked/); assert.match(snap.text, /Coordinate exchanges: 0/);
+    checks.push('iframe 输入绑定 Chrome 子目标，不暴露可被父页面伪造的坐标消息');
+    await call('browser_navigate', { ...args, action: 'back' });
+    snap = await call('browser_snapshot', args);
+    assert.ok(snap.elements.some(e => e.name === 'Drag slider'));
+
     const full = await call('browser_screenshot', { ...args, fullPage: true, format: 'png' });
     const bytes = Buffer.from(full.data, 'base64');
     assert.equal(full.mimeType, 'image/png'); assert.equal(bytes.readUInt32BE(16), full.width); assert.equal(bytes.readUInt32BE(20), full.height);

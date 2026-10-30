@@ -15,7 +15,7 @@ npm test
 npm run check:release
 git diff --cached --stat
 git diff --cached --check
-git commit -m "Prepare Codex Browser Use 0.5.0 for GitHub"
+git commit -m "Prepare Codex Browser Use 0.5.1 for GitHub"
 npm run package
 ```
 
@@ -51,6 +51,6 @@ git push -u origin main
 
 同步 `package.json`、`package-lock.json`、`plugin.json`、`.codex-plugin/plugin.json`、`extension/manifest.json` 和 `extension/version.js` 的版本，并更新 CHANGELOG。保持扩展公钥与 ID 稳定。
 
-完成相关测试后，在确认要发布的提交上创建版本 tag。初次发布的说明草稿见 [releases/0.5.0.md](releases/0.5.0.md)。创建 GitHub Release 时附上 ZIP、SHA-256 和 manifest；发布动作需单独执行，本项目没有自动公开发布脚本。
+完成相关测试后，在确认要发布的提交上创建版本 tag。当前版本说明草稿见 [releases/0.5.1.md](releases/0.5.1.md)。创建 GitHub Release 时附上 ZIP、SHA-256 和 manifest；发布动作需单独执行，本项目没有自动公开发布脚本。
 
 `output/` 下的真实 Chrome 报告、媒体证据和本机验收记录不附加到 Release。展示功能时应另用无登录信息的演示页面制作素材。
