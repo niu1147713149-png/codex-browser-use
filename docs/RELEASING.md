@@ -45,7 +45,17 @@ git push -u origin main
 
 建议 topics：`codex`、`mcp`、`chrome-extension`、`browser-automation`、`native-messaging`。
 
-推送后查看 Actions 检查结果；CI 在 Windows/Linux 和 Node.js 22/24 上执行本地检查及单元测试，只上传打包产物作为 Actions artifact，不自动创建 Release。首次公开前建议启用 GitHub 的私密漏洞报告。
+推送后查看 Actions 检查结果；CI 在 Windows/Linux 和 Node.js 22/24 上执行本地检查及单元测试，只上传打包产物作为 Actions artifact，不自动创建 Release。
+
+## 将现有仓库对外开源
+
+公开前核对要发布的提交和完整 Git 历史。保留 MIT 许可证、第三方设计来源、安装说明和问题报告入口；运行数据及本机配置继续留在被忽略的目录中。`check:release` 只扫描当前暂存树，历史提交需要单独检查。
+
+先把准备公开的内容推送到原仓库并确认 Actions 检查通过，再将 GitHub 仓库的 **Settings → General → Danger Zone → Change repository visibility** 改为 **Public**。以仓库所有者明确要求的可见性为准；公开会让已有提交历史一并可见。
+
+仓库公开后，核对未登录访问能够读取 README、许可证和源码，检查仓库简介及 topics，并在 **Settings → Security** 中启用 GitHub 私密漏洞报告。`package.json` 的 `private: true` 仅防止意外发布到 npm，不影响 GitHub 开源和 MIT 授权，保持该值即可。
+
+作者服务与赞助入口放在 README 和 `.github/FUNDING.yml` 中；使用维护者确认的公开网址，清楚标注服务归属、用途及自愿性。推广链接不应成为安装前提，也不写入 Agent 的浏览器操作指令或替用户更换 API 配置。上游项目鸣谢继续保留在 README 和 `THIRD_PARTY_NOTICES.md`，并与商业服务入口分别说明。
 
 ## 版本发布
 
